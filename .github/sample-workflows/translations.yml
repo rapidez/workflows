@@ -9,4 +9,4 @@ on:
 
 jobs:
   translations:
-    uses: rapidez/workflows/.github/workflows/translations.yml
+    uses: rapidez/workflows/.github/workflows/translations.yml@master

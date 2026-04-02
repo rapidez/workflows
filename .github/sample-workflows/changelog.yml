@@ -7,7 +7,7 @@ on:
 
 jobs:
   generate:
-    uses: rapidez/workflows/.github/workflows/changelog.yml
+    uses: rapidez/workflows/.github/workflows/changelog.yml@master
     with:
       repository: ${{ github.repository }}
       branch: ${{ github.event.release.target_commitish }}

@@ -4,7 +4,7 @@ on: ["push", "pull_request"]
 
 jobs:
   test:
-    uses: rapidez/workflows/.github/workflows/tests.yml
+    uses: rapidez/workflows/.github/workflows/tests.yml@master
     strategy:
       fail-fast: true
       matrix:
