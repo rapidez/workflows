@@ -1,0 +1,50 @@
+name: tests
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        required: false
+        type: string
+        default: ubuntu-latest
+      php:
+        required: false
+        type: number
+        default: 8.5
+      laravel:
+        required: false
+        type: string
+        default: "13.*"
+      testbench:
+        required: false
+        type: string
+        default: "11.*" # Testbench 11 is for Laravel 13
+      stability:
+        required: false
+        type: string
+        default: "prefer-stable"
+
+jobs:
+  test:
+    runs-on: ${{ inputs.os }}
+
+    name: P${{ inputs.php }} - L${{ inputs.laravel }} - ${{ inputs.stability }} - ${{ inputs.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ inputs.php }}
+          extensions: dom, curl, libxml, mbstring, zip, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv, imagick, fileinfo
+          coverage: none
+
+      - name: Install dependencies
+        run: |
+          composer require "laravel/framework:${{ inputs.laravel }}" "orchestra/testbench:${{ inputs.testbench }}" --no-interaction --no-update
+          composer update --${{ inputs.stability }} --prefer-dist --no-interaction
+
+      - name: Execute tests
+        run: php ./vendor/bin/phpunit

@@ -1,0 +1,7 @@
+name: style
+
+on: ["push", "pull_request"]
+
+jobs:
+  test:
+    uses: rapidez/workflows/.github/workflows/style.yml
