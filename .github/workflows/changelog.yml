@@ -1,0 +1,50 @@
+name: "Update Changelog"
+
+on:
+  workflow_call:
+    inputs:
+      repository:
+        required: true
+        type: string
+      branch:
+        required: true
+        type: string
+      ref:
+        required: true
+        type: string
+      token:
+        required: true
+        type: string
+      github-token:
+        required: true
+        type: string
+      os:
+        required: false
+        type: string
+        default: ubuntu-latest
+
+jobs:
+  generate:
+    runs-on: ${{ inputs.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ inputs.branch }}
+          token: ${{ inputs.token }}
+
+      - name: Generate changelog
+        uses: justbetter/generate-changelogs-action@main
+        env:
+          GITHUB_TOKEN: ${{ inputs.github-token }}
+        with:
+          repository: ${{ inputs.repository }}
+          sha: ${{ inputs.ref }}
+
+      - name: Commit CHANGELOG
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          branch: ${{ inputs.branch }}
+          commit_message: Update CHANGELOG
+          file_pattern: CHANGELOG.md

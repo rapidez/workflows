@@ -5,3 +5,9 @@ on: ["push", "pull_request"]
 jobs:
   test:
     uses: rapidez/workflows/.github/workflows/prettier.yml
+    with:
+      os: ${{ matrix.os }}
+      php: ${{ matrix.php }}
+      laravel: ${{ matrix.laravel }}
+      testbench: ${{ matrix.testbench }}
+      stability: ${{ matrix.stability }}

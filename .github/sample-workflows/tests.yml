@@ -17,9 +17,9 @@ jobs:
             testbench: 10.*
           - laravel: 13.*
             testbench: 11.*
-      with:
-        os: ${{ matrix.os }}
-        php: ${{ matrix.php }}
-        laravel: ${{ matrix.laravel }}
-        testbench: ${{ matrix.testbench }}
-        stability: ${{ matrix.stability }}
+    with:
+      os: ${{ matrix.os }}
+      php: ${{ matrix.php }}
+      laravel: ${{ matrix.laravel }}
+      testbench: ${{ matrix.testbench }}
+      stability: ${{ matrix.stability }}
