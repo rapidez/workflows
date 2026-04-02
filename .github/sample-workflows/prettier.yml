@@ -7,7 +7,3 @@ jobs:
     uses: rapidez/workflows/.github/workflows/prettier.yml@master
     with:
       os: ${{ matrix.os }}
-      php: ${{ matrix.php }}
-      laravel: ${{ matrix.laravel }}
-      testbench: ${{ matrix.testbench }}
-      stability: ${{ matrix.stability }}
