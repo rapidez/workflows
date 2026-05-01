@@ -4,4 +4,6 @@ on: ["push", "pull_request"]
 
 jobs:
   test:
-    uses: rapidez/workflows/.github/workflows/prettier.yml
+    uses: rapidez/workflows/.github/workflows/prettier.yml@master
+    with:
+      os: ${{ matrix.os }}
