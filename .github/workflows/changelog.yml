@@ -12,12 +12,6 @@ on:
       ref:
         required: true
         type: string
-      token:
-        required: true
-        type: string
-      github-token:
-        required: true
-        type: string
       os:
         required: false
         type: string
@@ -32,12 +26,12 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: ${{ inputs.branch }}
-          token: ${{ inputs.token }}
+          token: ${{ secrets.RAPIDEZ_ACTIONS_ACCOUNT_PAT }}
 
       - name: Generate changelog
         uses: justbetter/generate-changelogs-action@main
         env:
-          GITHUB_TOKEN: ${{ inputs.github-token }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           repository: ${{ inputs.repository }}
           sha: ${{ inputs.ref }}
