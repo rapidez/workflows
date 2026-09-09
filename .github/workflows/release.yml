@@ -41,7 +41,12 @@ jobs:
           elif [[ "$BRANCH" == "master" ]]; then
             # Master holds the newest major, which is one higher than the last branch split.
             LATEST="$(gh api "repos/$GITHUB_REPOSITORY/branches" --paginate --jq '.[].name' | grep -E '^[0-9]+\.x$' | cut -d. -f1 | sort -n | tail -1 || true)"
-            MAJOR="$(( ${LATEST:-0} + 1 ))"
+            if [[ -n "$LATEST" ]]; then
+              MAJOR="$(( LATEST + 1 ))"
+            else
+              # Nothing has ever been split off, so master simply keeps the major of its last tag.
+              MAJOR=""
+            fi
             MATCH="[0-9]*.[0-9]*.[0-9]*"
           else
             echo "::error::Releases can only be made from master or an x.x branch, not from $BRANCH"
@@ -140,14 +145,14 @@ jobs:
 
           if [[ -z "$PREVIOUS" ]]; then
             # The very first release on this branch.
-            VERSION="$MAJOR.0.0"
+            VERSION="${MAJOR:-1}.0.0"
           elif [[ "$PREVIOUS" == *-* ]]; then
             # Promote a pre-release to its final version.
             VERSION="${PREVIOUS%%-*}"
           else
             IFS=. read -r PREVIOUS_MAJOR PREVIOUS_MINOR PREVIOUS_PATCH <<< "$PREVIOUS"
 
-            if (( PREVIOUS_MAJOR < MAJOR )); then
+            if [[ -n "$MAJOR" ]] && (( PREVIOUS_MAJOR < MAJOR )); then
               # There has been a branch split since the last release, so this is a new major.
               VERSION="$MAJOR.0.0"
             elif [[ "$ONLY_FIXES" == "true" ]]; then
