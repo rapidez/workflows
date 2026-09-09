@@ -1,0 +1,193 @@
+name: Release
+
+on:
+  workflow_call:
+    inputs:
+      branch:
+        required: true
+        type: string
+      os:
+        required: false
+        type: string
+        default: ubuntu-latest
+
+jobs:
+  release:
+    runs-on: ${{ inputs.os }}
+
+    permissions:
+      contents: write
+      pull-requests: read
+
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      BRANCH: ${{ inputs.branch }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+          fetch-depth: 0
+
+      - name: Determine the previous version
+        run: |
+          set -euo pipefail
+
+          if [[ "$BRANCH" =~ ^([0-9]+)\.x$ ]]; then
+            # An x.x branch only holds the releases of that major.
+            MAJOR="${BASH_REMATCH[1]}"
+            MATCH="$MAJOR.[0-9]*.[0-9]*"
+          elif [[ "$BRANCH" == "master" ]]; then
+            # Master holds the newest major, which is one higher than the last branch split.
+            LATEST="$(gh api "repos/$GITHUB_REPOSITORY/branches" --paginate --jq '.[].name' | grep -E '^[0-9]+\.x$' | cut -d. -f1 | sort -n | tail -1 || true)"
+            MAJOR="$(( ${LATEST:-0} + 1 ))"
+            MATCH="[0-9]*.[0-9]*.[0-9]*"
+          else
+            echo "::error::Releases can only be made from master or an x.x branch, not from $BRANCH"
+            exit 1
+          fi
+
+          PREVIOUS="$(git describe --tags --abbrev=0 --match "$MATCH" 2> /dev/null || true)"
+
+          echo "MAJOR=$MAJOR" >> "$GITHUB_ENV"
+          echo "PREVIOUS=$PREVIOUS" >> "$GITHUB_ENV"
+          echo "Last version on $BRANCH: ${PREVIOUS:-none}"
+
+      - name: Generate the release notes
+        run: |
+          set -euo pipefail
+
+          if [[ -n "$PREVIOUS" ]]; then
+            echo "Collecting the commits since $PREVIOUS"
+            RANGE="$PREVIOUS..HEAD"
+          else
+            echo "No previous version found on $BRANCH, collecting all commits"
+            RANGE="HEAD"
+          fi
+
+          SECTIONS="$RUNNER_TEMP/sections"
+          mkdir -p "$SECTIONS"
+
+          COMMITS="$RUNNER_TEMP/commits"
+          git log --no-merges --reverse --format='%H%x09%s' "$RANGE" > "$COMMITS"
+
+          while IFS=$'\t' read -r SHA SUBJECT; do
+            # Skip the commits made by our own workflows.
+            case "$SUBJECT" in
+              'Update CHANGELOG'|'Apply fixes from '*) continue ;;
+            esac
+
+            ENTRY="$SUBJECT"
+
+            if [[ "$SUBJECT" =~ \(#([0-9]+)\)$ ]]; then
+              # Everything gets squashed so the pull request number is part of the subject.
+              NUMBER="${BASH_REMATCH[1]}"
+            elif ! NUMBER="$(gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/pulls" --jq '.[0].number // empty' < /dev/null)"; then
+              echo "::error::Could not look up the pull request of $SHA"
+              exit 1
+            elif [[ -n "$NUMBER" ]]; then
+              ENTRY="$SUBJECT (#$NUMBER)"
+            else
+              # Pushed straight to the branch, so there is no pull request to label.
+              ENTRY="$SUBJECT (${SHA:0:7})"
+            fi
+
+            # The labels decide the version number, so never silently fall back on a failed lookup.
+            LABELS=""
+            if [[ -n "$NUMBER" ]] && ! LABELS="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$NUMBER" --jq '.labels[].name' < /dev/null)"; then
+              echo "::error::Could not determine the labels of #$NUMBER"
+              exit 1
+            fi
+
+            # Without a "Changelog" label the change ends up under Fixed.
+            SECTION="Fixed"
+            while IFS= read -r LABEL; do
+              case "$LABEL" in
+                'Changelog - Added'|'Changelog - Changed'|'Changelog - Deprecated'|'Changelog - Removed'|'Changelog - Fixed'|'Changelog - Security')
+                  SECTION="${LABEL#Changelog - }"
+                  ;;
+              esac
+            done <<< "$LABELS"
+
+            echo "- $ENTRY" >> "$SECTIONS/$SECTION"
+          done < "$COMMITS"
+
+          NOTES="$RUNNER_TEMP/notes.md"
+          : > "$NOTES"
+
+          # Anything besides a fix makes this a minor release instead of a patch.
+          ONLY_FIXES=true
+
+          for SECTION in Added Changed Deprecated Removed Fixed Security; do
+            [[ -s "$SECTIONS/$SECTION" ]] || continue
+            [[ "$SECTION" == "Fixed" ]] || ONLY_FIXES=false
+            printf '### %s\n\n' "$SECTION" >> "$NOTES"
+            cat "$SECTIONS/$SECTION" >> "$NOTES"
+            printf '\n' >> "$NOTES"
+          done
+
+          if [[ ! -s "$NOTES" ]]; then
+            echo "::error::There is nothing to release since $PREVIOUS"
+            exit 1
+          fi
+
+          echo "ONLY_FIXES=$ONLY_FIXES" >> "$GITHUB_ENV"
+
+      - name: Determine the new version
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$PREVIOUS" ]]; then
+            # The very first release on this branch.
+            VERSION="$MAJOR.0.0"
+          elif [[ "$PREVIOUS" == *-* ]]; then
+            # Promote a pre-release to its final version.
+            VERSION="${PREVIOUS%%-*}"
+          else
+            IFS=. read -r PREVIOUS_MAJOR PREVIOUS_MINOR PREVIOUS_PATCH <<< "$PREVIOUS"
+
+            if (( PREVIOUS_MAJOR < MAJOR )); then
+              # There has been a branch split since the last release, so this is a new major.
+              VERSION="$MAJOR.0.0"
+            elif [[ "$ONLY_FIXES" == "true" ]]; then
+              VERSION="$PREVIOUS_MAJOR.$PREVIOUS_MINOR.$(( PREVIOUS_PATCH + 1 ))"
+            else
+              VERSION="$PREVIOUS_MAJOR.$(( PREVIOUS_MINOR + 1 )).0"
+            fi
+          fi
+
+          if git rev-parse -q --verify "refs/tags/$VERSION" > /dev/null; then
+            echo "::error::Tag $VERSION already exists"
+            exit 1
+          fi
+
+          if [[ "$ONLY_FIXES" == "true" ]]; then
+            REASON="only fixes since ${PREVIOUS:-the start}"
+          else
+            REASON="more than just fixes since ${PREVIOUS:-the start}"
+          fi
+
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "REASON=$REASON" >> "$GITHUB_ENV"
+          echo "Releasing $VERSION from $BRANCH, there are $REASON"
+
+      - name: Create the draft release
+        run: |
+          set -euo pipefail
+
+          URL="$(gh release create "$VERSION" \
+            --draft \
+            --target "$BRANCH" \
+            --title "$VERSION" \
+            --notes-file "$RUNNER_TEMP/notes.md")"
+
+          echo "Draft release created: $URL"
+
+          {
+            echo "## [$VERSION]($URL)"
+            echo
+            echo "Check and publish the draft release, the version number is based on there being $REASON."
+            echo
+            cat "$RUNNER_TEMP/notes.md"
+          } >> "$GITHUB_STEP_SUMMARY"
