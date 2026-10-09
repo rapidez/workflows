@@ -21,6 +21,11 @@ jobs:
   generate:
     runs-on: ${{ inputs.os }}
 
+    # Publishing a draft release triggers both "published" and "edited",
+    # running them at the same time makes one of them fail on the push.
+    concurrency:
+      group: changelog-${{ inputs.repository }}-${{ inputs.branch }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
