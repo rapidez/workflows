@@ -16,12 +16,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Install Node dependencies
+        uses: pnpm/setup@v3
         with:
-          node-version: lts/*
-
-      - name: Install Yarn dependencies
-        run: npm install -g yarn && yarn
+          version: 11
+          runtime: node@lts
+          cache: false
+          install: true
 
       - name: Execute tests
         run: ./node_modules/.bin/prettier resources --check
