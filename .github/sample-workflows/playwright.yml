@@ -1,0 +1,23 @@
+name: Playwright
+
+on:
+  push:
+    branches:
+      - master
+      - '*.x'
+  pull_request:
+  schedule:
+    - cron: '30 0 * * *'
+  workflow_dispatch:
+    inputs:
+      update_all_screenshots:
+        description: 'Update all screenshots?'
+        type: boolean
+
+jobs:
+  playwright:
+    uses: rapidez/workflows/.github/workflows/playwright.yml@master
+    with:
+      package: your-package # For example "core" for rapidez/core
+      update-all-screenshots: ${{ inputs.update_all_screenshots || false }}
+    secrets: inherit
