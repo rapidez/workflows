@@ -152,8 +152,27 @@ jobs:
           install: true
           working-directory: rapidez/rapidez
 
+      - name: Get the Playwright browsers cache key
+        id: playwright-cache-key
+        run: echo "key=playwright-browsers-${{ runner.os }}-$(pnpm exec playwright --version | cut -d' ' -f2)-$(date -u +%Y-%m-%d)" >> $GITHUB_OUTPUT
+
+      - name: Restore the Playwright browsers
+        id: playwright-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.playwright-cache-key.outputs.key }}
+
       - name: Install Playwright Browsers
+        timeout-minutes: 10
         run: pnpm playwright install --with-deps
+
+      - name: Cache the Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.playwright-cache-key.outputs.key }}
 
       - name: Frontend Build
         run: pnpm run prod
