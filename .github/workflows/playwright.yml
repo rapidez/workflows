@@ -157,8 +157,6 @@ jobs:
           restore-keys: |
             playwright-browsers-${{ runner.os }}-
 
-      # The system dependencies (apt) are not covered by the browser cache and the
-      # Ubuntu mirror is sometimes very slow, so the downloaded packages are cached too.
       - name: Install Playwright Browsers
         timeout-minutes: 5
         run: |
