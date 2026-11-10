@@ -165,16 +165,18 @@ jobs:
           for attempt in 1 2 3; do
             timeout 4m yarn playwright install --with-deps && exit 0
             echo "Attempt $attempt failed, retrying in 15 seconds"
+            sudo pkill -x apt-get || true
             sleep 15
+            sudo dpkg --configure -a || true
           done
           exit 1
 
       - name: Collect the downloaded apt packages
-        if: always() && steps.playwright-cache.outputs.cache-hit != 'true'
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: cp -n /var/cache/apt/archives/*.deb ~/.cache/apt-archives/ 2>/dev/null || true
 
       - name: Cache the Playwright browsers
-        if: always() && steps.playwright-cache.outputs.cache-hit != 'true'
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: |
