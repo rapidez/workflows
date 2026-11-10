@@ -160,18 +160,36 @@ jobs:
         id: playwright-cache
         uses: actions/cache/restore@v4
         with:
-          path: ~/.cache/ms-playwright
+          path: |
+            ~/.cache/ms-playwright
+            ~/.cache/apt-archives
           key: ${{ steps.playwright-cache-key.outputs.key }}
+          restore-keys: |
+            playwright-browsers-${{ runner.os }}-
 
       - name: Install Playwright Browsers
-        timeout-minutes: 10
-        run: pnpm playwright install --with-deps
+        timeout-minutes: 12
+        run: |
+          mkdir -p ~/.cache/apt-archives
+          sudo cp -n ~/.cache/apt-archives/*.deb /var/cache/apt/archives/ 2>/dev/null || true
+          for attempt in 1 2 3; do
+            timeout 4m pnpm playwright install --with-deps && exit 0
+            echo "Attempt $attempt failed, retrying in 15 seconds"
+            sleep 15
+          done
+          exit 1
+
+      - name: Collect the downloaded apt packages
+        if: always() && steps.playwright-cache.outputs.cache-hit != 'true'
+        run: cp -n /var/cache/apt/archives/*.deb ~/.cache/apt-archives/ 2>/dev/null || true
 
       - name: Cache the Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        if: always() && steps.playwright-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
-          path: ~/.cache/ms-playwright
+          path: |
+            ~/.cache/ms-playwright
+            ~/.cache/apt-archives
           key: ${{ steps.playwright-cache-key.outputs.key }}
 
       - name: Frontend Build
